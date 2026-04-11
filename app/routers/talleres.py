@@ -1,0 +1,111 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+from app.database import get_db
+from app.schemas.taller import TallerCrear, TallerActualizar, TallerRespuesta, ServicioCrear, ServicioRespuesta
+from app.services.taller_service import (
+    crear_taller, obtener_taller, obtener_todos_talleres,
+    actualizar_taller, agregar_servicio
+)
+
+router = APIRouter(
+    prefix="/talleres",
+    tags=["Talleres"]
+)
+
+@router.post("/", response_model=TallerRespuesta)
+def registrar_taller(datos: TallerCrear, db: Session = Depends(get_db)):
+    taller = crear_taller(db, datos)
+    if not taller:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo ya está registrado"
+        )
+    return {
+        "id_taller": taller.id_taller,
+        "nombre_taller": taller.nombre_taller,
+        "direccion": taller.direccion,
+        "latitud": taller.latitud,
+        "longitud": taller.longitud,
+        "telefono": taller.telefono,
+        "descripcion": taller.descripcion,
+        "estado": taller.estado,
+        "calificacion_promedio": taller.calificacion_promedio,
+        "nombre": taller.usuario.nombre,
+        "correo": taller.usuario.correo,
+        "servicios": taller.servicios
+    }
+
+@router.get("/", response_model=List[TallerRespuesta])
+def listar_talleres(db: Session = Depends(get_db)):
+    talleres = obtener_todos_talleres(db)
+    return [{
+        "id_taller": t.id_taller,
+        "nombre_taller": t.nombre_taller,
+        "direccion": t.direccion,
+        "latitud": t.latitud,
+        "longitud": t.longitud,
+        "telefono": t.telefono,
+        "descripcion": t.descripcion,
+        "estado": t.estado,
+        "calificacion_promedio": t.calificacion_promedio,
+        "nombre": t.usuario.nombre,
+        "correo": t.usuario.correo,
+        "servicios": t.servicios
+    } for t in talleres]
+
+@router.get("/{id_taller}", response_model=TallerRespuesta)
+def ver_taller(id_taller: int, db: Session = Depends(get_db)):
+    taller = obtener_taller(db, id_taller)
+    if not taller:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Taller no encontrado"
+        )
+    return {
+        "id_taller": taller.id_taller,
+        "nombre_taller": taller.nombre_taller,
+        "direccion": taller.direccion,
+        "latitud": taller.latitud,
+        "longitud": taller.longitud,
+        "telefono": taller.telefono,
+        "descripcion": taller.descripcion,
+        "estado": taller.estado,
+        "calificacion_promedio": taller.calificacion_promedio,
+        "nombre": taller.usuario.nombre,
+        "correo": taller.usuario.correo,
+        "servicios": taller.servicios
+    }
+
+@router.put("/{id_taller}", response_model=TallerRespuesta)
+def actualizar(id_taller: int, datos: TallerActualizar, db: Session = Depends(get_db)):
+    taller = actualizar_taller(db, id_taller, datos)
+    if not taller:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Taller no encontrado"
+        )
+    return {
+        "id_taller": taller.id_taller,
+        "nombre_taller": taller.nombre_taller,
+        "direccion": taller.direccion,
+        "latitud": taller.latitud,
+        "longitud": taller.longitud,
+        "telefono": taller.telefono,
+        "descripcion": taller.descripcion,
+        "estado": taller.estado,
+        "calificacion_promedio": taller.calificacion_promedio,
+        "nombre": taller.usuario.nombre,
+        "correo": taller.usuario.correo,
+        "servicios": taller.servicios
+    }
+
+@router.post("/{id_taller}/servicios", response_model=ServicioRespuesta)
+def agregar_servicio_taller(id_taller: int, datos: ServicioCrear, db: Session = Depends(get_db)):
+    servicio = agregar_servicio(db, id_taller, datos)
+    if not servicio:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Taller no encontrado"
+        )
+    return servicio
