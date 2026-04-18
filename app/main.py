@@ -1,12 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth
-from app.models import usuario, rol  # <- agregar esta línea
-from app.database import Base, engine
-from app.routers import auth, conductores, vehiculos, recuperacion, talleres, tecnicos,roles
-from app.models import usuario, rol, conductor, vehiculo, recuperacion as recuperacion_model,taller , servicio_taller, tecnico
+from sqlalchemy.orm import Session
+from app.database import Base, engine, get_db
+from app.routers import auth, conductores, vehiculos, recuperacion, talleres, tecnicos, roles
+from app.models import usuario, rol, conductor, vehiculo, recuperacion as recuperacion_model, taller, servicio_taller, tecnico
 
-Base.metadata.create_all(bind=engine)  
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="EmergenciasVial API",
@@ -33,3 +32,17 @@ app.include_router(roles.router)
 @app.get("/")
 def root():
     return {"mensaje": "Bienvenido a EmergenciasVial API"}
+
+@app.get("/estadisticas")
+def obtener_estadisticas(db: Session = Depends(get_db)):
+    from app.models.conductor import Conductor
+    from app.models.taller import Taller
+    from app.models.tecnico import Tecnico
+    from app.models.rol import Rol
+
+    return {
+        "talleres": db.query(Taller).count(),
+        "conductores": db.query(Conductor).count(),
+        "tecnicos": db.query(Tecnico).count(),
+        "roles": db.query(Rol).count()
+    }

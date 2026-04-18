@@ -92,3 +92,21 @@ def eliminar_conductor(id_conductor: int, db: Session = Depends(get_db)):
     db.delete(usuario)
     db.commit()
     return {"mensaje": "Conductor eliminado correctamente"}
+@router.get("/por-usuario/{id_usuario}", response_model=ConductorRespuesta)
+def obtener_conductor_por_usuario(id_usuario: int, db: Session = Depends(get_db)):
+    conductor = db.query(Conductor).join(Usuario).filter(
+        Usuario.id_usuario == id_usuario
+    ).first()
+    if not conductor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conductor no encontrado"
+        )
+    return {
+        "id_conductor": conductor.id_conductor,
+        "licencia": conductor.licencia,
+        "direccion": conductor.direccion,
+        "nombre": conductor.usuario.nombre,
+        "correo": conductor.usuario.correo,
+        "telefono": conductor.usuario.telefono
+    }
