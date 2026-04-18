@@ -27,6 +27,7 @@ class TecnicoRespuesta(BaseModel):
     nombre: str
     correo: str
     telefono: Optional[str] = None
+    nombre_taller: Optional[str] = None
 
     class Config:
         from_attributes = True

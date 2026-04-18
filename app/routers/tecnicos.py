@@ -7,7 +7,8 @@ from app.services.tecnico_service import (
     crear_tecnico, obtener_tecnicos_taller,
     obtener_tecnico, actualizar_tecnico, cambiar_disponibilidad
 )
-
+from app.models.tecnico import Tecnico
+from app.models.usuario import Usuario
 router = APIRouter(
     prefix="/tecnicos",
     tags=["Técnicos"]
@@ -107,3 +108,18 @@ def disponibilidad(id_tecnico: int, datos: CambiarDisponibilidad, db: Session = 
         "correo": tecnico.usuario.correo,
         "telefono": tecnico.usuario.telefono
     }
+@router.get("/", response_model=List[TecnicoRespuesta])
+def listar_todos_tecnicos(db: Session = Depends(get_db)):
+    tecnicos = db.query(Tecnico).all()
+    return [{
+        "id_tecnico": t.id_tecnico,
+        "id_taller": t.id_taller,
+        "especialidad": t.especialidad,
+        "estado_disponibilidad": t.estado_disponibilidad,
+        "latitud_actual": t.latitud_actual,
+        "longitud_actual": t.longitud_actual,
+        "nombre": t.usuario.nombre,
+        "correo": t.usuario.correo,
+        "telefono": t.usuario.telefono,
+        "nombre_taller": t.taller.nombre_taller if t.taller else '-'
+    } for t in tecnicos]

@@ -7,7 +7,7 @@ from app.services.taller_service import (
     crear_taller, obtener_taller, obtener_todos_talleres,
     actualizar_taller, agregar_servicio
 )
-
+from app.models.taller import Taller
 router = APIRouter(
     prefix="/talleres",
     tags=["Talleres"]
@@ -109,3 +109,25 @@ def agregar_servicio_taller(id_taller: int, datos: ServicioCrear, db: Session = 
             detail="Taller no encontrado"
         )
     return servicio
+@router.get("/por-usuario/{id_usuario}", response_model=TallerRespuesta)
+def obtener_taller_por_usuario(id_usuario: int, db: Session = Depends(get_db)):
+    taller = db.query(Taller).filter(Taller.id_usuario == id_usuario).first()
+    if not taller:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Taller no encontrado"
+        )
+    return {
+        "id_taller": taller.id_taller,
+        "nombre_taller": taller.nombre_taller,
+        "direccion": taller.direccion,
+        "latitud": taller.latitud,
+        "longitud": taller.longitud,
+        "telefono": taller.telefono,
+        "descripcion": taller.descripcion,
+        "estado": taller.estado,
+        "calificacion_promedio": taller.calificacion_promedio,
+        "nombre": taller.usuario.nombre,
+        "correo": taller.usuario.correo,
+        "servicios": taller.servicios
+    }
