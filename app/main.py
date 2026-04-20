@@ -1,11 +1,13 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from app.models import usuario, rol, conductor, vehiculo, recuperacion as recuperacion_model, taller, servicio_taller, tecnico
+from app.models import emergencia as emergencia_model
 from app.database import Base, engine, get_db
 from app.routers import auth, conductores, vehiculos, recuperacion, talleres, tecnicos, roles
 from app.routers.emergencias import router as emergencias_router 
-from app.models import usuario, rol, conductor, vehiculo, recuperacion as recuperacion_model, taller, servicio_taller, tecnico
-from app.models import emergencia as emergencia_model
+
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
