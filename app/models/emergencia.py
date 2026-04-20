@@ -40,7 +40,8 @@ class Emergencia(Base):
     transcripcion_audio = Column(Text, nullable=True)
 
     estado = Column(Enum(EstadoEmergenciaEnum), default=EstadoEmergenciaEnum.pendiente, nullable=False)
-
+    id_taller = Column(Integer, ForeignKey("talleres.id_taller"), nullable=True)
+    id_tecnico = Column(Integer, ForeignKey("tecnicos.id_tecnico"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

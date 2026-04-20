@@ -80,7 +80,33 @@ def obtener_emergencia_detalle(
 ):
     return svc.obtener_emergencia(db, id_emergencia)
 
+# Emergencias pendientes (para que el taller vea las disponibles)
+@router.get("/pendientes", response_model=List[EmergenciaResumen])
+def listar_pendientes(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return (
+        db.query(Emergencia)
+        .filter(Emergencia.estado == EstadoEmergenciaEnum.pendiente)
+        .order_by(Emergencia.created_at.desc())
+        .all()
+    )
 
+
+# Emergencias asignadas a un taller específico
+@router.get("/taller/{id_taller}", response_model=List[EmergenciaResumen])
+def listar_emergencias_taller(
+    id_taller: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return (
+        db.query(Emergencia)
+        .filter(Emergencia.id_taller == id_taller)
+        .order_by(Emergencia.created_at.desc())
+        .all()
+    )
 # Cancelar emergencia
 @router.delete("/{id_emergencia}", response_model=EmergenciaOut)
 def cancelar_emergencia(

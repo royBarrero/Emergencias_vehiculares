@@ -81,6 +81,8 @@ class EmergenciaEstadoOut(BaseModel):
 class EmergenciaResumen(BaseModel):
     """Para el historial del conductor"""
     id_emergencia: int
+    id_taller: Optional[int] = None
+    id_tecnico: Optional[int] = None
     tipo_incidente: str
     prioridad: PrioridadEnum
     estado: EstadoEmergenciaEnum
