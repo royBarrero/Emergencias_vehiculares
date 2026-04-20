@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from app.database import get_db
 from app.routers.auth import get_current_user
-from app.models.emergencia import TipoEvidenciaEnum
+from app.models.emergencia import TipoEvidenciaEnum, Emergencia, EstadoEmergenciaEnum
 from app.models.conductor import Conductor
 from app.schemas.emergencia import (
     EmergenciaCreate, EmergenciaOut,
