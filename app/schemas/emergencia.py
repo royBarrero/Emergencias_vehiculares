@@ -90,3 +90,9 @@ class EmergenciaResumen(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+class EmergenciaUpdate(BaseModel):
+    estado: Optional[EstadoEmergenciaEnum] = None
+    id_taller: Optional[int] = None
+    id_tecnico: Optional[int] = None
+    

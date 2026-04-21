@@ -8,7 +8,7 @@ from app.models.emergencia import TipoEvidenciaEnum, Emergencia, EstadoEmergenci
 from app.models.conductor import Conductor
 from app.schemas.emergencia import (
     EmergenciaCreate, EmergenciaOut,
-    EmergenciaEstadoOut, EmergenciaResumen
+    EmergenciaEstadoOut, EmergenciaResumen,EmergenciaUpdate
 )
 from app.services import emergencia_service as svc
 
@@ -106,7 +106,15 @@ def obtener_emergencia_detalle(
     return svc.obtener_emergencia(db, id_emergencia)
 
 # Emergencias pendientes (para que el taller vea las disponibles)
-
+# CU16/CU17/CU18 — Actualizar estado, asignar taller y técnico
+@router.patch("/{id_emergencia}", response_model=EmergenciaOut)
+def actualizar_emergencia(
+    id_emergencia: int,
+    datos: EmergenciaUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return svc.actualizar_estado_emergencia(db, id_emergencia, datos.model_dump(exclude_unset=True))
 # Cancelar emergencia
 @router.delete("/{id_emergencia}", response_model=EmergenciaOut)
 def cancelar_emergencia(

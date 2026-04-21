@@ -88,3 +88,16 @@ async def agregar_evidencia(
     db.commit()
     db.refresh(evidencia)
     return evidencia
+def actualizar_estado_emergencia(db: Session, id_emergencia: int, datos: dict) -> Emergencia:
+    em = obtener_emergencia(db, id_emergencia)
+    
+    if 'estado' in datos:
+        em.estado = datos['estado']
+    if 'id_taller' in datos:
+        em.id_taller = datos['id_taller']
+    if 'id_tecnico' in datos:
+        em.id_tecnico = datos['id_tecnico']
+    
+    db.commit()
+    db.refresh(em)
+    return em
