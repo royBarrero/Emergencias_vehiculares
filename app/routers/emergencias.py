@@ -52,12 +52,39 @@ def listar_emergencias_taller(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    return (
+    from app.models.tecnico import Tecnico
+    from app.models.usuario import Usuario
+
+    emergencias = (
         db.query(Emergencia)
         .filter(Emergencia.id_taller == id_taller)
         .order_by(Emergencia.created_at.desc())
         .all()
     )
+
+    resultado = []
+    for em in emergencias:
+        nombre_tecnico = None
+        if em.id_tecnico:
+            tecnico = db.query(Tecnico).filter(Tecnico.id_tecnico == em.id_tecnico).first()
+            if tecnico:
+                usuario = db.query(Usuario).filter(Usuario.id_usuario == tecnico.id_usuario).first()
+                if usuario:
+                    nombre_tecnico = usuario.nombre
+
+        resultado.append({
+            "id_emergencia": em.id_emergencia,
+            "id_taller": em.id_taller,
+            "id_tecnico": em.id_tecnico,
+            "nombre_tecnico": nombre_tecnico,
+            "tipo_incidente": em.tipo_incidente,
+            "prioridad": em.prioridad,
+            "estado": em.estado,
+            "direccion_aproximada": em.direccion_aproximada,
+            "created_at": em.created_at,
+        })
+
+    return resultado
 # CU08 — Registrar emergencia
 @router.post("/", response_model=EmergenciaOut, status_code=status.HTTP_201_CREATED)
 def registrar_emergencia(

@@ -31,3 +31,8 @@ class TecnicoRespuesta(BaseModel):
 
     class Config:
         from_attributes = True
+class TecnicoActualizar(BaseModel):
+    nombre: Optional[str] = None
+    telefono: Optional[str] = None
+    especialidad: Optional[str] = None
+    estado_disponibilidad: Optional[str] = None        

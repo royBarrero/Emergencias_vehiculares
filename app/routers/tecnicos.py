@@ -108,6 +108,18 @@ def disponibilidad(id_tecnico: int, datos: CambiarDisponibilidad, db: Session = 
         "correo": tecnico.usuario.correo,
         "telefono": tecnico.usuario.telefono
     }
+@router.delete("/{id_tecnico}")
+def eliminar_tecnico(id_tecnico: int, db: Session = Depends(get_db)):
+    tecnico = obtener_tecnico(db, id_tecnico)
+    if not tecnico:
+        raise HTTPException(status_code=404, detail="Técnico no encontrado")
+    # Eliminar usuario asociado también
+    usuario = db.query(Usuario).filter(Usuario.id_usuario == tecnico.id_usuario).first()
+    db.delete(tecnico)
+    if usuario:
+        db.delete(usuario)
+    db.commit()
+    return {"mensaje": "Técnico eliminado correctamente"}
 @router.get("/", response_model=List[TecnicoRespuesta])
 def listar_todos_tecnicos(db: Session = Depends(get_db)):
     tecnicos = db.query(Tecnico).all()

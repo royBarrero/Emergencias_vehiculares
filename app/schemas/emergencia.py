@@ -84,6 +84,7 @@ class EmergenciaResumen(BaseModel):
     id_emergencia: int
     id_taller: Optional[int] = None
     id_tecnico: Optional[int] = None
+    nombre_tecnico: Optional[str] = None
     tipo_incidente: str
     prioridad: PrioridadEnum
     estado: EstadoEmergenciaEnum

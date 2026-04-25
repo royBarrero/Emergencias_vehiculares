@@ -121,7 +121,19 @@ def actualizar_estado_emergencia(db: Session, id_emergencia: int, datos: dict) -
         em.id_taller = datos['id_taller']
     if 'id_tecnico' in datos:
         em.id_tecnico = datos['id_tecnico']
-    
+        # Cambiar disponibilidad del técnico a ocupado
+        from app.models.tecnico import Tecnico
+        tecnico = db.query(Tecnico).filter(Tecnico.id_tecnico == datos['id_tecnico']).first()
+        if tecnico:
+            tecnico.estado_disponibilidad = 'ocupado'
+
+    # Si la emergencia se finaliza, liberar al técnico
+    if datos.get('estado') == 'finalizada' and em.id_tecnico:
+        from app.models.tecnico import Tecnico
+        tecnico = db.query(Tecnico).filter(Tecnico.id_tecnico == em.id_tecnico).first()
+        if tecnico:
+            tecnico.estado_disponibilidad = 'disponible'
+
     db.commit()
     db.refresh(em)
     return em
