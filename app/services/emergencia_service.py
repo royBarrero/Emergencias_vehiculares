@@ -3,13 +3,10 @@ from fastapi import HTTPException, status, UploadFile
 from app.models.emergencia import Emergencia, EvidenciaEmergencia, EstadoEmergenciaEnum, TipoEvidenciaEnum
 from app.schemas.emergencia import EmergenciaCreate
 from typing import Optional
-import shutil
-import os
 import uuid
-
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
+import requests
+from app.config import SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET
+from app.services.ia_service import transcribir_y_mejorar_audio, analizar_imagen_vehiculo
 
 def crear_emergencia(db: Session, data: EmergenciaCreate, id_conductor: int) -> Emergencia:
     emergencia = Emergencia(
@@ -66,24 +63,51 @@ async def agregar_evidencia(
     file: UploadFile,
     descripcion: Optional[str] = None,
 ) -> EvidenciaEmergencia:
-    obtener_emergencia(db, id_emergencia)  # valida que exista
+    obtener_emergencia(db, id_emergencia)
 
-    # Guardar archivo en disco (carpeta uploads/)
+    # Leer contenido del archivo
+    contenido = await file.read()
     extension = file.filename.split(".")[-1]
-    nombre_unico = f"{uuid.uuid4()}.{extension}"
-    ruta_archivo = os.path.join(UPLOAD_DIR, nombre_unico)
+    folder = "fotos" if tipo == TipoEvidenciaEnum.foto else "audios"
+    nombre_unico = f"{folder}/{uuid.uuid4()}.{extension}"
 
-    with open(ruta_archivo, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Subir a Supabase Storage via REST API
+    url_upload = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{nombre_unico}"
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": file.content_type if file.content_type and file.content_type != "application/octet-stream" else f"image/{extension}" if tipo == TipoEvidenciaEnum.foto else "audio/m4a",
+    }
+    response = requests.post(url_upload, headers=headers, data=contenido)
 
-    url_archivo = f"/uploads/{nombre_unico}"
+    if response.status_code not in (200, 201):
+        raise HTTPException(status_code=500, detail="Error al subir archivo a Supabase")
+
+    # URL pública del archivo
+    url_archivo = f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{nombre_unico}"
+
+    # Procesar con IA
+    transcripcion = None
+    clasificacion_ia = None
+
+    if tipo == TipoEvidenciaEnum.audio:
+        transcripcion = transcribir_y_mejorar_audio(url_archivo)
+        # Actualizar transcripción en la emergencia
+        if transcripcion:
+            em = obtener_emergencia(db, id_emergencia)
+            em.transcripcion_audio = transcripcion
+            db.commit()
+
+    elif tipo == TipoEvidenciaEnum.foto:
+            clasificacion_ia = analizar_imagen_vehiculo(url_archivo)
 
     evidencia = EvidenciaEmergencia(
-        id_emergencia=id_emergencia,
-        tipo=tipo,
-        url_archivo=url_archivo,
-        descripcion=descripcion,
-    )
+            id_emergencia=id_emergencia,
+            tipo=tipo,
+            url_archivo=url_archivo,
+            descripcion=descripcion,
+            transcripcion=transcripcion,
+            clasificacion_ia=clasificacion_ia,
+        )
     db.add(evidencia)
     db.commit()
     db.refresh(evidencia)

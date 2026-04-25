@@ -56,6 +56,7 @@ class EvidenciaEmergencia(Base):
     url_archivo = Column(String(1000), nullable=False)
     descripcion = Column(String(255), nullable=True)
     transcripcion = Column(Text, nullable=True)
+    clasificacion_ia = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

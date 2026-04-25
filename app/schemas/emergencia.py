@@ -33,6 +33,7 @@ class EvidenciaOut(BaseModel):
     url_archivo: str
     descripcion: Optional[str]
     transcripcion: Optional[str]
+    clasificacion_ia: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
