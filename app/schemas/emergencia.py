@@ -63,6 +63,8 @@ class EmergenciaOut(BaseModel):
     descripcion: Optional[str]
     transcripcion_audio: Optional[str]
     estado: EstadoEmergenciaEnum
+    id_taller: Optional[int] = None    # ← agregar
+    id_tecnico: Optional[int] = None   # ← agregar
     evidencias: List[EvidenciaOut] = []
     created_at: datetime
     updated_at: Optional[datetime]
