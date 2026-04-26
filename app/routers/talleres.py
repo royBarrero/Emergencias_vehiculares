@@ -109,6 +109,19 @@ def agregar_servicio_taller(id_taller: int, datos: ServicioCrear, db: Session = 
             detail="Taller no encontrado"
         )
     return servicio
+@router.delete("/{id_taller}/servicios/{id_servicio}")
+def eliminar_servicio_taller(id_taller: int, id_servicio: int, db: Session = Depends(get_db)):
+    from app.models.servicio_taller import ServicioTaller
+    servicio = db.query(ServicioTaller).filter(
+        ServicioTaller.id_servicio == id_servicio,
+        ServicioTaller.id_taller == id_taller
+    ).first()
+    if not servicio:
+        raise HTTPException(status_code=404, detail="Servicio no encontrado")
+    db.delete(servicio)
+    db.commit()
+    return {"mensaje": "Servicio eliminado correctamente"}
+
 @router.get("/por-usuario/{id_usuario}", response_model=TallerRespuesta)
 def obtener_taller_por_usuario(id_usuario: int, db: Session = Depends(get_db)):
     taller = db.query(Taller).filter(Taller.id_usuario == id_usuario).first()
