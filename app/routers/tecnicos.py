@@ -120,6 +120,23 @@ def eliminar_tecnico(id_tecnico: int, db: Session = Depends(get_db)):
         db.delete(usuario)
     db.commit()
     return {"mensaje": "Técnico eliminado correctamente"}
+@router.get("/por-usuario/{id_usuario}", response_model=TecnicoRespuesta)
+def obtener_tecnico_por_usuario(id_usuario: int, db: Session = Depends(get_db)):
+    tecnico = db.query(Tecnico).filter(Tecnico.id_usuario == id_usuario).first()
+    if not tecnico:
+        raise HTTPException(status_code=404, detail="Técnico no encontrado")
+    return {
+        "id_tecnico": tecnico.id_tecnico,
+        "id_taller": tecnico.id_taller,
+        "especialidad": tecnico.especialidad,
+        "estado_disponibilidad": tecnico.estado_disponibilidad,
+        "latitud_actual": tecnico.latitud_actual,
+        "longitud_actual": tecnico.longitud_actual,
+        "nombre": tecnico.usuario.nombre,
+        "correo": tecnico.usuario.correo,
+        "telefono": tecnico.usuario.telefono,
+        "nombre_taller": tecnico.taller.nombre_taller if tecnico.taller else None
+    }
 @router.get("/", response_model=List[TecnicoRespuesta])
 def listar_todos_tecnicos(db: Session = Depends(get_db)):
     tecnicos = db.query(Tecnico).all()

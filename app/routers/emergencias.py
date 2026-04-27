@@ -142,6 +142,44 @@ def actualizar_emergencia(
     current_user=Depends(get_current_user),
 ):
     return svc.actualizar_estado_emergencia(db, id_emergencia, datos.model_dump(exclude_unset=True))
+@router.get("/tecnico/{id_tecnico}/historial", response_model=List[EmergenciaResumen])
+def historial_tecnico(
+    id_tecnico: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    return (
+        db.query(Emergencia)
+        .filter(
+            Emergencia.id_tecnico == id_tecnico,
+            Emergencia.estado == EstadoEmergenciaEnum.finalizada
+        )
+        .order_by(Emergencia.created_at.desc())
+        .all()
+    )
+@router.get("/tecnico/{id_tecnico}", response_model=EmergenciaOut)
+def obtener_emergencia_tecnico(
+    id_tecnico: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    from app.models.conductor import Conductor
+    em = (
+        db.query(Emergencia)
+        .filter(
+            Emergencia.id_tecnico == id_tecnico,
+            Emergencia.estado.in_([
+                EstadoEmergenciaEnum.asignada,
+                EstadoEmergenciaEnum.en_camino,
+                EstadoEmergenciaEnum.atendiendo
+            ])
+        )
+        .order_by(Emergencia.created_at.desc())
+        .first()
+    )
+    if not em:
+        return None
+    return em
 # Cancelar emergencia
 @router.delete("/{id_emergencia}", response_model=EmergenciaOut)
 def cancelar_emergencia(

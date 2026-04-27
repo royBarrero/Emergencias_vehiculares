@@ -26,7 +26,7 @@ def transcribir_y_mejorar_audio(url_audio: str) -> str:
         """
 
         resultado = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=[
                 prompt,
                 types.Part.from_bytes(data=audio_bytes, mime_type="audio/m4a")
@@ -57,7 +57,7 @@ def analizar_imagen_vehiculo(url_imagen: str) -> str:
         """
 
         resultado = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=[
                 prompt,
                 types.Part.from_bytes(data=imagen_bytes, mime_type="image/jpeg")
