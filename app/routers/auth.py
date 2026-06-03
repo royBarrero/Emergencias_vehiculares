@@ -23,13 +23,36 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Correo o contraseña incorrectos"
         )
-    token = crear_token({"sub": str(usuario.id_usuario), "rol": usuario.id_rol})
+    
+    # Obtener tenant_id si el usuario es dueño de un taller
+    tenant_id = None
+    if usuario.id_rol == 2:
+        from app.models.taller import Taller
+        taller = db.query(Taller).filter(Taller.id_usuario == usuario.id_usuario).first()
+        if taller:
+            tenant_id = taller.id_tenant
+    elif usuario.id_rol == 3:
+        from app.models.tecnico import Tecnico
+        from app.models.taller import Taller
+        tecnico = db.query(Tecnico).filter(Tecnico.id_usuario == usuario.id_usuario).first()
+        if tecnico:
+            taller = db.query(Taller).filter(Taller.id_taller == tecnico.id_taller).first()
+            if taller:
+                tenant_id = taller.id_tenant
+    elif usuario.id_rol == 5:
+        from app.models.tenant import Tenant
+        tenant = db.query(Tenant).filter(Tenant.id_usuario_admin == usuario.id_usuario).first()
+        if tenant:
+            tenant_id = tenant.id_tenant
+
+    token = crear_token({"sub": str(usuario.id_usuario), "rol": usuario.id_rol, "tenant_id": tenant_id})
     return {
         "access_token": token,
         "token_type": "bearer",
         "id_usuario": usuario.id_usuario,
         "nombre": usuario.nombre,
-        "id_rol": usuario.id_rol
+        "id_rol": usuario.id_rol,
+        "tenant_id": tenant_id
     }
 
 @router.post("/registro", response_model=UsuarioRespuesta)
@@ -62,4 +85,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     usuario = db.query(Usuario).filter(Usuario.id_usuario == int(id_usuario)).first()
     if not usuario:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
+    
+    # Agregar tenant_id al objeto usuario desde el token
+    usuario.tenant_id = payload.get("tenant_id")
     return usuario

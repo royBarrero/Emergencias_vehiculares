@@ -48,6 +48,7 @@ class TallerRespuesta(BaseModel):
     calificacion_promedio: float
     nombre: str
     correo: str
+    id_tenant: Optional[int] = None
     servicios: List[ServicioRespuesta] = []
 
     class Config:

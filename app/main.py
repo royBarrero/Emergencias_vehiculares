@@ -1,14 +1,18 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from app.models import usuario, rol, conductor, vehiculo, recuperacion as recuperacion_model, taller, servicio_taller, tecnico
+from app.models import tenant ,usuario, rol, conductor, vehiculo, recuperacion as recuperacion_model, taller, servicio_taller, tecnico,bitacora
 from app.models import emergencia as emergencia_model
 from app.models import pago as pago_model
+
 from app.database import Base, engine, get_db
 from app.routers import auth, conductores, vehiculos, recuperacion, talleres, tecnicos, roles
 from app.routers.emergencias import router as emergencias_router 
 from app.routers.pagos import router as pagos_router
-
+from app.routers.tenants import router as tenants_router
+from app.routers.bitacora import router as bitacora_router
+from app.middleware.tenant_middleware import tenant_middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 
 Base.metadata.create_all(bind=engine)
@@ -26,7 +30,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+app.add_middleware(BaseHTTPMiddleware, dispatch=tenant_middleware),
 app.include_router(auth.router)
 app.include_router(conductores.router)
 app.include_router(vehiculos.router)
@@ -36,7 +40,8 @@ app.include_router(tecnicos.router)
 app.include_router(roles.router)
 app.include_router(emergencias_router)
 app.include_router(pagos_router)
-
+app.include_router(tenants_router)
+app.include_router(bitacora_router)
 @app.get("/")
 def root():
     return {"mensaje": "Bienvenido a EmergenciasVial API"}

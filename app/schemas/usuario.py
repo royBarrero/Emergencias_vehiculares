@@ -29,3 +29,4 @@ class TokenRespuesta(BaseModel):
     id_usuario: int
     nombre: str
     id_rol: int
+    tenant_id: Optional[int] = None

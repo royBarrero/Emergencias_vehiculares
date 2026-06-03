@@ -7,6 +7,7 @@ from app.services.taller_service import (
     crear_taller, obtener_taller, obtener_todos_talleres,
     actualizar_taller, agregar_servicio
 )
+from app.routers.auth import get_current_user
 from app.models.taller import Taller
 router = APIRouter(
     prefix="/talleres",
@@ -33,12 +34,17 @@ def registrar_taller(datos: TallerCrear, db: Session = Depends(get_db)):
         "calificacion_promedio": taller.calificacion_promedio,
         "nombre": taller.usuario.nombre,
         "correo": taller.usuario.correo,
+        "id_tenant": taller.id_tenant,
         "servicios": taller.servicios
     }
 
 @router.get("/", response_model=List[TallerRespuesta])
-def listar_talleres(db: Session = Depends(get_db)):
-    talleres = obtener_todos_talleres(db)
+def listar_talleres(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    # Superadmin ve todos, taller solo ve los de su tenant
+    if current_user.id_rol == 4:
+        talleres = obtener_todos_talleres(db)
+    else:
+        talleres = db.query(Taller).filter(Taller.id_tenant == current_user.tenant_id).all()
     return [{
         "id_taller": t.id_taller,
         "nombre_taller": t.nombre_taller,
@@ -51,6 +57,7 @@ def listar_talleres(db: Session = Depends(get_db)):
         "calificacion_promedio": t.calificacion_promedio,
         "nombre": t.usuario.nombre,
         "correo": t.usuario.correo,
+        "id_tenant": t.id_tenant,
         "servicios": t.servicios
     } for t in talleres]
 
@@ -74,6 +81,7 @@ def ver_taller(id_taller: int, db: Session = Depends(get_db)):
         "calificacion_promedio": taller.calificacion_promedio,
         "nombre": taller.usuario.nombre,
         "correo": taller.usuario.correo,
+        "id_tenant": taller.id_tenant,
         "servicios": taller.servicios
     }
 
@@ -97,6 +105,7 @@ def actualizar(id_taller: int, datos: TallerActualizar, db: Session = Depends(ge
         "calificacion_promedio": taller.calificacion_promedio,
         "nombre": taller.usuario.nombre,
         "correo": taller.usuario.correo,
+        "id_tenant": taller.id_tenant,
         "servicios": taller.servicios
     }
 
@@ -122,7 +131,7 @@ def eliminar_servicio_taller(id_taller: int, id_servicio: int, db: Session = Dep
     db.commit()
     return {"mensaje": "Servicio eliminado correctamente"}
 @router.get("/cercanos/{id_emergencia}")
-def talleres_cercanos(id_emergencia: int, db: Session = Depends(get_db)):
+def talleres_cercanos(id_emergencia: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     from app.models.emergencia import Emergencia
     from app.models.servicio_taller import ServicioTaller
     import math
@@ -139,7 +148,6 @@ def talleres_cercanos(id_emergencia: int, db: Session = Depends(get_db)):
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
         return R * c
 
-    # Mapear tipo de incidente a servicio
     mapa_servicios = {
         'Pinchazo': 'Llantas y alineación',
         'Falla de motor': 'Motor',
@@ -152,30 +160,29 @@ def talleres_cercanos(id_emergencia: int, db: Session = Depends(get_db)):
 
     servicio_requerido = mapa_servicios.get(emergencia.tipo_incidente)
 
-    talleres = db.query(Taller).filter(Taller.estado == 'activo').all()
+    # Filtrar talleres por tenant del conductor (usando tenant_id de la emergencia)
+    query = db.query(Taller).filter(Taller.estado == 'activo')
+    if current_user.tenant_id:
+        query = query.filter(Taller.id_tenant == current_user.tenant_id)
+
+    talleres = query.all()
     resultado = []
 
     for t in talleres:
         if not t.latitud or not t.longitud:
             continue
-
         distancia = calcular_distancia(
             emergencia.latitud, emergencia.longitud,
             t.latitud, t.longitud
         )
-
-        if distancia > 10:  # radio de 10km
+        if distancia > 10:
             continue
-
-        # Verificar si tiene el servicio requerido
         tiene_servicio = True
         if servicio_requerido:
             servicios = [s.nombre_servicio for s in t.servicios]
             tiene_servicio = servicio_requerido in servicios
-
         if not tiene_servicio:
             continue
-
         resultado.append({
             "id_taller": t.id_taller,
             "nombre_taller": t.nombre_taller,
@@ -209,5 +216,6 @@ def obtener_taller_por_usuario(id_usuario: int, db: Session = Depends(get_db)):
         "calificacion_promedio": taller.calificacion_promedio,
         "nombre": taller.usuario.nombre,
         "correo": taller.usuario.correo,
+        "id_tenant": taller.id_tenant,
         "servicios": taller.servicios
     }
