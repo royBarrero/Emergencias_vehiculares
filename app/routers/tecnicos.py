@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
+from app.routers.auth import get_current_user
 from app.schemas.tecnico import TecnicoCrear, TecnicoActualizar, CambiarDisponibilidad, TecnicoRespuesta
 from app.services.tecnico_service import (
     crear_tecnico, obtener_tecnicos_taller,
@@ -9,19 +10,20 @@ from app.services.tecnico_service import (
 )
 from app.models.tecnico import Tecnico
 from app.models.usuario import Usuario
+from fastapi import Request
+from app.routers.bitacora import registrar_accion
 router = APIRouter(
     prefix="/tecnicos",
     tags=["Técnicos"]
 )
 
 @router.post("/", response_model=TecnicoRespuesta)
-def registrar_tecnico(datos: TecnicoCrear, db: Session = Depends(get_db)):
+def registrar_tecnico(datos: TecnicoCrear, request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     tecnico = crear_tecnico(db, datos)
     if not tecnico:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo ya está registrado"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El correo ya está registrado")
+    registrar_accion(db, current_user.id_usuario, current_user.tenant_id, "CREAR", f"Técnico creado: {tecnico.usuario.nombre}", request.client.host)
+    
     return {
         "id_tecnico": tecnico.id_tecnico,
         "id_taller": tecnico.id_taller,
@@ -109,16 +111,17 @@ def disponibilidad(id_tecnico: int, datos: CambiarDisponibilidad, db: Session = 
         "telefono": tecnico.usuario.telefono
     }
 @router.delete("/{id_tecnico}")
-def eliminar_tecnico(id_tecnico: int, db: Session = Depends(get_db)):
+def eliminar_tecnico(id_tecnico: int, request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     tecnico = obtener_tecnico(db, id_tecnico)
     if not tecnico:
         raise HTTPException(status_code=404, detail="Técnico no encontrado")
-    # Eliminar usuario asociado también
+    nombre = tecnico.usuario.nombre
     usuario = db.query(Usuario).filter(Usuario.id_usuario == tecnico.id_usuario).first()
     db.delete(tecnico)
     if usuario:
         db.delete(usuario)
     db.commit()
+    registrar_accion(db, current_user.id_usuario, current_user.tenant_id, "ELIMINAR", f"Técnico eliminado: {nombre}", request.client.host)
     return {"mensaje": "Técnico eliminado correctamente"}
 @router.get("/por-usuario/{id_usuario}", response_model=TecnicoRespuesta)
 def obtener_tecnico_por_usuario(id_usuario: int, db: Session = Depends(get_db)):
