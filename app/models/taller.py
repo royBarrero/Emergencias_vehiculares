@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey,DateTime
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -7,6 +7,7 @@ class Taller(Base):
 
     id_taller = Column(Integer, primary_key=True, index=True)
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), unique=True)
+    id_tenant = Column(Integer, ForeignKey("tenants.id_tenant"), nullable=True)
     nombre_taller = Column(String(100), nullable=False)
     direccion = Column(String(200))
     latitud = Column(Float)
@@ -17,5 +18,6 @@ class Taller(Base):
     calificacion_promedio = Column(Float, default=0.0)
 
     usuario = relationship("Usuario", back_populates="taller")
+    tenant = relationship("Tenant", back_populates="talleres")
     servicios = relationship("ServicioTaller", back_populates="taller")
     tecnicos = relationship("Tecnico", back_populates="taller")

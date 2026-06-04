@@ -14,11 +14,23 @@ def crear_taller(db: Session, datos):
         correo=datos.correo,
         contrasena=encriptar_contrasena(datos.contrasena),
         telefono=datos.telefono,
-        id_rol=2  # rol taller
+        id_rol=2
     )
     db.add(nuevo_usuario)
     db.commit()
     db.refresh(nuevo_usuario)
+
+    # Auto-crear tenant para taller independiente
+    from app.models.tenant import Tenant
+    nuevo_tenant = Tenant(
+        nombre=datos.nombre_taller,
+        descripcion=f"Tenant de {datos.nombre_taller}",
+        estado=True,
+        id_usuario_admin=nuevo_usuario.id_usuario
+    )
+    db.add(nuevo_tenant)
+    db.commit()
+    db.refresh(nuevo_tenant)
 
     nuevo_taller = Taller(
         id_usuario=nuevo_usuario.id_usuario,
@@ -27,13 +39,13 @@ def crear_taller(db: Session, datos):
         latitud=datos.latitud,
         longitud=datos.longitud,
         descripcion=datos.descripcion,
-        telefono=datos.telefono
+        telefono=datos.telefono,
+        id_tenant=nuevo_tenant.id_tenant
     )
     db.add(nuevo_taller)
     db.commit()
     db.refresh(nuevo_taller)
 
-    # Agregar servicios si vienen
     for servicio in datos.servicios:
         nuevo_servicio = ServicioTaller(
             id_taller=nuevo_taller.id_taller,

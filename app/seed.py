@@ -6,6 +6,7 @@ from app.models.taller import Taller
 from app.models.servicio_taller import ServicioTaller
 from app.models.tecnico import Tecnico
 from app.models.vehiculo import Vehiculo
+from app.models.tenant import Tenant
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -23,6 +24,7 @@ def run_seed():
             Rol(id_rol=2, nombre="taller", descripcion="Taller mecánico"),
             Rol(id_rol=3, nombre="tecnico", descripcion="Técnico de taller"),
             Rol(id_rol=4, nombre="admin", descripcion="Administrador"),
+            Rol(id_rol=5, nombre="tenant_admin", descripcion="Administrador de red de talleres"),
         ]
         db.add_all(roles)
         db.commit()
@@ -80,10 +82,28 @@ def run_seed():
             estado=True,
             id_rol=4
         )
+        
 
         db.add_all([u_conductor1, u_conductor2, u_taller1, u_taller2, u_taller3, u_admin])
         db.commit()
-
+        u_tenant_admin1 = Usuario(
+            nombre="Admin Auxilio Norte",
+            correo="admin@auxilionorte.com",
+            contrasena=hash_password("123456"),
+            telefono="70011111",
+            estado=True,
+            id_rol=5
+        )
+        u_tenant_admin2 = Usuario(
+            nombre="Admin Mecánicos Express",
+            correo="admin@mecanicosexpress.com",
+            contrasena=hash_password("123456"),
+            telefono="70022222",
+            estado=True,
+            id_rol=5
+        )
+        db.add_all([u_tenant_admin1, u_tenant_admin2])
+        db.commit()
         # CONDUCTORES
         conductor1 = Conductor(
             id_usuario=u_conductor1.id_usuario,
@@ -97,7 +117,23 @@ def run_seed():
         )
         db.add_all([conductor1, conductor2])
         db.commit()
-
+       
+        # TENANTS
+        tenant1 = Tenant(
+            nombre="Auxilio Norte",
+            descripcion="Red de talleres zona norte de Santa Cruz",
+            estado=True
+        )
+        tenant2 = Tenant(
+            nombre="Mecánicos Express",
+            descripcion="Red de talleres express Santa Cruz",
+            estado=True
+        )
+        db.add_all([tenant1, tenant2])
+        db.commit()
+        tenant1.id_usuario_admin = u_tenant_admin1.id_usuario
+        tenant2.id_usuario_admin = u_tenant_admin2.id_usuario
+        db.commit()
         # VEHICULOS
         vehiculos = [
             Vehiculo(
@@ -125,6 +161,7 @@ def run_seed():
         # TALLERES (alrededor de -17.9052529, -63.2101961)
         taller1 = Taller(
             id_usuario=u_taller1.id_usuario,
+            id_tenant=tenant1.id_tenant,
             nombre_taller="Taller El Motor",
             direccion="Av. Banzer km 3, Santa Cruz",
             telefono="70033003",
@@ -135,6 +172,7 @@ def run_seed():
         )
         taller2 = Taller(
             id_usuario=u_taller2.id_usuario,
+            id_tenant=tenant1.id_tenant,
             nombre_taller="Taller Santa Cruz",
             direccion="Radial 27, Santa Cruz",
             telefono="70044004",
@@ -145,6 +183,7 @@ def run_seed():
         )
         taller3 = Taller(
             id_usuario=u_taller3.id_usuario,
+            id_tenant=tenant2.id_tenant,
             nombre_taller="Taller Los Equipos",
             direccion="Av. San Martín, Santa Cruz",
             telefono="70055005",
