@@ -1,5 +1,5 @@
 from app.models import rol 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.usuario import UsuarioCrear, LoginRequest, TokenRespuesta, UsuarioRespuesta
@@ -8,6 +8,7 @@ from jose import JWTError, jwt
 from app.config import SECRET_KEY, ALGORITHM
 from app.models.usuario import Usuario
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.services.bitacora_service import registrar_evento
 
 security = HTTPBearer()
 router = APIRouter(
@@ -16,8 +17,8 @@ router = APIRouter(
 )
 
 @router.post("/login", response_model=TokenRespuesta)
-def login(request: LoginRequest, db: Session = Depends(get_db)):
-    usuario = autenticar_usuario(db, request.correo, request.contrasena)
+def login(request: Request, datos: LoginRequest, db: Session = Depends(get_db)):
+    usuario = autenticar_usuario(db, datos.correo, datos.contrasena)
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -46,6 +47,15 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
             tenant_id = tenant.id_tenant
 
     token = crear_token({"sub": str(usuario.id_usuario), "rol": usuario.id_rol, "tenant_id": tenant_id})
+    # Registrar en bitácora
+    registrar_evento(
+        db,
+        id_usuario=usuario.id_usuario,
+        accion="LOGIN",
+        descripcion=f"Inicio de sesión exitoso",
+        ip_address=request.client.host if hasattr(request, 'client') else None,
+        id_tenant=tenant_id
+    )
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -70,6 +80,14 @@ def registro(usuario: UsuarioCrear, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El correo ya está registrado"
         )
+    # Registrar en bitácora
+    registrar_evento(
+        db,
+        id_usuario=nuevo.id_usuario,
+        accion="REGISTRO",
+        descripcion=f"Nuevo usuario registrado",
+        ip_address=usuario.ip_address if hasattr(usuario, 'ip_address') else None
+    )
     return nuevo
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):

@@ -135,7 +135,104 @@ def listar_talleres_tenant(id_tenant: int, db: Session = Depends(get_db), curren
         "nombre_taller": t.nombre_taller,
         "direccion": t.direccion,
         "telefono": t.telefono,
+        "descripcion": t.descripcion,
         "estado": t.estado,
         "calificacion_promedio": t.calificacion_promedio,
-        "id_tenant": t.id_tenant
+        "id_tenant": t.id_tenant,
+        "latitud": t.latitud,
+        "longitud": t.longitud
     } for t in tenant.talleres]
+@router.get("/{id_tenant}/talleres/{id_taller}/detalle")
+def detalle_taller_tenant(id_tenant: int, id_taller: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    taller = db.query(Taller).filter(
+        Taller.id_taller == id_taller,
+        Taller.id_tenant == id_tenant
+    ).first()
+    if not taller:
+        raise HTTPException(status_code=404, detail="Taller no encontrado")
+    return {
+        "id_taller": taller.id_taller,
+        "nombre_taller": taller.nombre_taller,
+        "direccion": taller.direccion,
+        "telefono": taller.telefono,
+        "descripcion": taller.descripcion,
+        "estado": taller.estado,
+        "calificacion_promedio": taller.calificacion_promedio,
+        "latitud": taller.latitud,
+        "longitud": taller.longitud,
+        "id_tenant": taller.id_tenant,
+        "encargado": {
+            "nombre": taller.usuario.nombre,
+            "correo": taller.usuario.correo,
+            "telefono": taller.usuario.telefono
+        }
+    }
+@router.patch("/{id_tenant}/talleres/{id_taller}")
+def editar_taller_tenant(id_tenant: int, id_taller: int, datos: dict, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    if current_user.id_rol not in [4, 5]:
+        raise HTTPException(status_code=403, detail="Sin permisos")
+    taller = db.query(Taller).filter(
+        Taller.id_taller == id_taller,
+        Taller.id_tenant == id_tenant
+    ).first()
+    if not taller:
+        raise HTTPException(status_code=404, detail="Taller no encontrado")
+    campos = ["nombre_taller", "direccion", "telefono", "descripcion", "estado", "latitud", "longitud"]
+    for campo in campos:
+        if campo in datos:
+            setattr(taller, campo, datos[campo])
+    db.commit()
+    db.refresh(taller)
+    return {"mensaje": "Taller actualizado correctamente"}
+@router.post("/{id_tenant}/talleres")
+def crear_taller_tenant(id_tenant: int, datos: dict, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    if current_user.id_rol not in [4, 5]:
+        raise HTTPException(status_code=403, detail="Sin permisos")
+    from app.models.usuario import Usuario
+    from app.models.servicio_taller import ServicioTaller
+    from app.services.auth_service import registrar_usuario, encriptar_contrasena
+
+    # Buscar usuario existente o crear nuevo
+    if datos.get("correo_existente"):
+        usuario = db.query(Usuario).filter(Usuario.correo == datos.get("correo_existente")).first()
+        if not usuario:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    else:
+        usuario = registrar_usuario(
+            db,
+            datos.get("nombre_admin"),
+            datos.get("correo_admin"),
+            datos.get("contrasena_admin"),
+            datos.get("telefono_admin"),
+            2
+        )
+        if not usuario:
+            raise HTTPException(status_code=400, detail="El correo ya está registrado")
+
+    nuevo_taller = Taller(
+        id_usuario=usuario.id_usuario,
+        nombre_taller=datos.get("nombre_taller"),
+        direccion=datos.get("direccion"),
+        latitud=datos.get("latitud"),
+        longitud=datos.get("longitud"),
+        telefono=datos.get("telefono"),
+        descripcion=datos.get("descripcion"),
+        estado="activo",
+        id_tenant=id_tenant
+    )
+    db.add(nuevo_taller)
+    db.commit()
+    db.refresh(nuevo_taller)
+
+    for servicio in datos.get("servicios", []):
+        db.add(ServicioTaller(
+            id_taller=nuevo_taller.id_taller,
+            nombre_servicio=servicio,
+            disponible=True
+        ))
+    db.commit()
+
+    return {
+        "mensaje": "Taller creado correctamente",
+        "id_taller": nuevo_taller.id_taller
+    }
