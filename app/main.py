@@ -11,6 +11,7 @@ from app.routers.emergencias import router as emergencias_router
 from app.routers.pagos import router as pagos_router
 from app.routers.tenants import router as tenants_router
 from app.routers.bitacora import router as bitacora_router
+from app.routers.kpis import router as kpis_router
 from app.routers.websocket_emergencias import router as ws_router
 from app.middleware.tenant_middleware import tenant_middleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -43,6 +44,7 @@ app.include_router(emergencias_router)
 app.include_router(pagos_router)
 app.include_router(tenants_router)
 app.include_router(bitacora_router)
+app.include_router(kpis_router)
 app.include_router(ws_router)
 @app.get("/")
 def root():
