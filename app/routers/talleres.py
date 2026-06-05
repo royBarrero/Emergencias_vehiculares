@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
@@ -9,19 +9,18 @@ from app.services.taller_service import (
 )
 from app.routers.auth import get_current_user
 from app.models.taller import Taller
+from app.routers.bitacora import registrar_accion
 router = APIRouter(
     prefix="/talleres",
     tags=["Talleres"]
 )
 
 @router.post("/", response_model=TallerRespuesta)
-def registrar_taller(datos: TallerCrear, db: Session = Depends(get_db)):
+def registrar_taller(datos: TallerCrear, request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     taller = crear_taller(db, datos)
     if not taller:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo ya está registrado"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El correo ya está registrado")
+    registrar_accion(db, current_user.id_usuario, current_user.tenant_id, "CREAR", f"Taller creado: {taller.nombre_taller}", request.client.host)
     return {
         "id_taller": taller.id_taller,
         "nombre_taller": taller.nombre_taller,
@@ -86,13 +85,11 @@ def ver_taller(id_taller: int, db: Session = Depends(get_db)):
     }
 
 @router.put("/{id_taller}", response_model=TallerRespuesta)
-def actualizar(id_taller: int, datos: TallerActualizar, db: Session = Depends(get_db)):
+def actualizar(id_taller: int, datos: TallerActualizar, request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     taller = actualizar_taller(db, id_taller, datos)
     if not taller:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Taller no encontrado"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Taller no encontrado")
+    registrar_accion(db, current_user.id_usuario, current_user.tenant_id, "EDITAR", f"Taller editado: {taller.nombre_taller}", request.client.host)
     return {
         "id_taller": taller.id_taller,
         "nombre_taller": taller.nombre_taller,
