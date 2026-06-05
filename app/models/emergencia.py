@@ -44,6 +44,7 @@ class Emergencia(Base):
     id_tecnico = Column(Integer, ForeignKey("tecnicos.id_tecnico"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    tiempo_estimado_reparacion = Column(String(100), nullable=True)
 
     evidencias = relationship("EvidenciaEmergencia", back_populates="emergencia", cascade="all, delete-orphan")
 
