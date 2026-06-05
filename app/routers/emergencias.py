@@ -11,6 +11,8 @@ from app.schemas.emergencia import (
     EmergenciaEstadoOut, EmergenciaResumen,EmergenciaUpdate
 )
 from app.services import emergencia_service as svc
+from app.models.taller import Taller
+from app.websockets.connection_manager import manager
 
 router = APIRouter(prefix="/emergencias", tags=["Emergencias"])
 
@@ -87,12 +89,27 @@ def listar_emergencias_taller(
     return resultado
 # CU08 — Registrar emergencia
 @router.post("/", response_model=EmergenciaOut, status_code=status.HTTP_201_CREATED)
-def registrar_emergencia(
+async def registrar_emergencia(
     data: EmergenciaCreate,
     db: Session = Depends(get_db),
     conductor: Conductor = Depends(get_conductor_actual),
 ):
-    return svc.crear_emergencia(db, data, conductor.id_conductor)
+    emergencia = svc.crear_emergencia(db, data, conductor.id_conductor)
+    
+    # Notificar a todos los talleres activos
+    talleres = db.query(Taller).filter(Taller.estado == 'activo').all()
+    for taller in talleres:
+        await manager.broadcast_taller(taller.id_taller, {
+            "tipo": "nueva_emergencia",
+            "id_emergencia": emergencia.id_emergencia,
+            "tipo_incidente": emergencia.tipo_incidente,
+            "prioridad": emergencia.prioridad,
+            "direccion_aproximada": emergencia.direccion_aproximada,
+            "latitud": emergencia.latitud,
+            "longitud": emergencia.longitud,
+        })
+    
+    return emergencia
 
 
 # CU09 — Subir evidencia (foto o audio)
@@ -135,13 +152,23 @@ def obtener_emergencia_detalle(
 # Emergencias pendientes (para que el taller vea las disponibles)
 # CU16/CU17/CU18 — Actualizar estado, asignar taller y técnico
 @router.patch("/{id_emergencia}", response_model=EmergenciaOut)
-def actualizar_emergencia(
+async def actualizar_emergencia(
     id_emergencia: int,
     datos: EmergenciaUpdate,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    return svc.actualizar_estado_emergencia(db, id_emergencia, datos.model_dump(exclude_unset=True))
+    emergencia = svc.actualizar_estado_emergencia(db, id_emergencia, datos.model_dump(exclude_unset=True))
+    
+    await manager.broadcast(id_emergencia, {
+        "tipo": "cambio_estado",
+        "id_emergencia": id_emergencia,
+        "estado": emergencia.estado.value,
+        "id_tecnico": emergencia.id_tecnico,
+        "id_taller": emergencia.id_taller,
+    })
+    
+    return emergencia
 @router.get("/tecnico/{id_tecnico}/historial", response_model=List[EmergenciaResumen])
 def historial_tecnico(
     id_tecnico: int,
