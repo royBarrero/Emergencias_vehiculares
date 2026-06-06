@@ -306,3 +306,172 @@ def geo_admin(
             "longitud": float(t.longitud),
         } for t in talleres]
     }
+
+SLA_ASIGNACION_MIN = 15  # minutos máximo para asignar taller
+SLA_ATENCION_MIN = 30    # minutos máximo para atender
+
+@router.get("/sla/taller/{id_taller}")
+def sla_taller(
+    id_taller: int,
+    fecha_inicio: Optional[datetime] = Query(None),
+    fecha_fin: Optional[datetime] = Query(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    query = db.query(Emergencia).filter(
+        Emergencia.id_taller == id_taller,
+        Emergencia.updated_at != None,
+        Emergencia.estado.in_([
+            EstadoEmergenciaEnum.asignada,
+            EstadoEmergenciaEnum.en_camino,
+            EstadoEmergenciaEnum.atendiendo,
+            EstadoEmergenciaEnum.finalizada
+        ])
+    )
+    if fecha_inicio:
+        query = query.filter(Emergencia.created_at >= fecha_inicio)
+    if fecha_fin:
+        query = query.filter(Emergencia.created_at <= fecha_fin)
+
+    emergencias = query.all()
+
+    cumplidos = []
+    incumplidos = []
+
+    for e in emergencias:
+        tiempo = (e.updated_at - e.created_at).total_seconds() / 60
+        item = {
+            "id_emergencia": e.id_emergencia,
+            "tipo_incidente": e.tipo_incidente,
+            "tiempo_min": round(tiempo, 1),
+            "estado": e.estado.value,
+            "fecha": e.created_at,
+            "cumple_asignacion": tiempo <= SLA_ASIGNACION_MIN,
+            "cumple_atencion": tiempo <= SLA_ATENCION_MIN,
+        }
+        if tiempo <= SLA_ATENCION_MIN:
+            cumplidos.append(item)
+        else:
+            incumplidos.append(item)
+
+    total = len(emergencias)
+    nivel_sla = round(len(cumplidos) / total * 100, 1) if total else 0
+    alerta = nivel_sla < 80
+
+    return {
+        "sla_asignacion_min": SLA_ASIGNACION_MIN,
+        "sla_atencion_min": SLA_ATENCION_MIN,
+        "total_evaluadas": total,
+        "cumplidos": len(cumplidos),
+        "incumplidos": len(incumplidos),
+        "nivel_sla_pct": nivel_sla,
+        "alerta": alerta,
+        "detalle_incumplidos": incumplidos[:10],
+        "detalle_cumplidos": cumplidos[:10],
+    }
+
+@router.get("/sla/tenant/{id_tenant}")
+def sla_tenant(
+    id_tenant: int,
+    fecha_inicio: Optional[datetime] = Query(None),
+    fecha_fin: Optional[datetime] = Query(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    talleres = db.query(Taller).filter(Taller.id_tenant == id_tenant).all()
+    resultado = []
+
+    for t in talleres:
+        query = db.query(Emergencia).filter(
+            Emergencia.id_taller == t.id_taller,
+            Emergencia.updated_at != None,
+            Emergencia.estado.in_([
+                EstadoEmergenciaEnum.asignada,
+                EstadoEmergenciaEnum.en_camino,
+                EstadoEmergenciaEnum.atendiendo,
+                EstadoEmergenciaEnum.finalizada
+            ])
+        )
+        if fecha_inicio:
+            query = query.filter(Emergencia.created_at >= fecha_inicio)
+        if fecha_fin:
+            query = query.filter(Emergencia.created_at <= fecha_fin)
+
+        emergencias = query.all()
+        total = len(emergencias)
+        cumplidos = sum(1 for e in emergencias if (e.updated_at - e.created_at).total_seconds() / 60 <= SLA_ATENCION_MIN)
+        nivel = round(cumplidos / total * 100, 1) if total else 0
+
+        resultado.append({
+            "id_taller": t.id_taller,
+            "nombre_taller": t.nombre_taller,
+            "total_evaluadas": total,
+            "cumplidos": cumplidos,
+            "incumplidos": total - cumplidos,
+            "nivel_sla_pct": nivel,
+            "alerta": nivel < 80
+        })
+
+    resultado.sort(key=lambda x: x["nivel_sla_pct"])
+    return {
+        "sla_atencion_min": SLA_ATENCION_MIN,
+        "talleres": resultado,
+        "promedio_sla": round(sum(r["nivel_sla_pct"] for r in resultado) / len(resultado), 1) if resultado else 0
+    }
+
+@router.get("/sla/admin")
+def sla_admin(
+    fecha_inicio: Optional[datetime] = Query(None),
+    fecha_fin: Optional[datetime] = Query(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    from fastapi import HTTPException
+    if current_user.id_rol != 4:
+        raise HTTPException(status_code=403, detail="Solo superadmin")
+
+    from app.models.tenant import Tenant
+    tenants = db.query(Tenant).all()
+    resultado = []
+
+    for tenant in tenants:
+        talleres_ids = [t.id_taller for t in db.query(Taller).filter(Taller.id_tenant == tenant.id_tenant).all()]
+        if not talleres_ids:
+            continue
+
+        query = db.query(Emergencia).filter(
+            Emergencia.id_taller.in_(talleres_ids),
+            Emergencia.updated_at != None,
+            Emergencia.estado.in_([
+                EstadoEmergenciaEnum.asignada,
+                EstadoEmergenciaEnum.en_camino,
+                EstadoEmergenciaEnum.atendiendo,
+                EstadoEmergenciaEnum.finalizada
+            ])
+        )
+        if fecha_inicio:
+            query = query.filter(Emergencia.created_at >= fecha_inicio)
+        if fecha_fin:
+            query = query.filter(Emergencia.created_at <= fecha_fin)
+
+        emergencias = query.all()
+        total = len(emergencias)
+        cumplidos = sum(1 for e in emergencias if (e.updated_at - e.created_at).total_seconds() / 60 <= SLA_ATENCION_MIN)
+        nivel = round(cumplidos / total * 100, 1) if total else 0
+
+        resultado.append({
+            "id_tenant": tenant.id_tenant,
+            "nombre_tenant": tenant.nombre,
+            "total_evaluadas": total,
+            "cumplidos": cumplidos,
+            "incumplidos": total - cumplidos,
+            "nivel_sla_pct": nivel,
+            "alerta": nivel < 80
+        })
+
+    resultado.sort(key=lambda x: x["nivel_sla_pct"])
+    return {
+        "sla_atencion_min": SLA_ATENCION_MIN,
+        "tenants": resultado,
+        "promedio_sla": round(sum(r["nivel_sla_pct"] for r in resultado) / len(resultado), 1) if resultado else 0
+    }
