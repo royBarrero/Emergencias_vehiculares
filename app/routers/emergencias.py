@@ -13,6 +13,9 @@ from app.schemas.emergencia import (
 from app.services import emergencia_service as svc
 from app.models.taller import Taller
 from app.websockets.connection_manager import manager
+from app.services.notificaciones_service import enviar_notificacion
+from app.models.conductor import Conductor
+from app.services.notificaciones_service import enviar_notificacion, enviar_notificacion_taller
 
 router = APIRouter(prefix="/emergencias", tags=["Emergencias"])
 
@@ -108,6 +111,15 @@ async def registrar_emergencia(
             "latitud": emergencia.latitud,
             "longitud": emergencia.longitud,
         })
+        # Notificar a talleres via OneSignal
+        for taller in talleres:
+            if taller.onesignal_id:
+                enviar_notificacion_taller(
+                    taller.onesignal_id,
+                    '🚨 Nueva emergencia',
+                    f'Tipo: {emergencia.tipo_incidente} — {emergencia.direccion_aproximada or "Sin dirección"}',
+                    {"id_emergencia": str(emergencia.id_emergencia)}
+                )
     
     return emergencia
 
@@ -159,7 +171,7 @@ async def actualizar_emergencia(
     current_user=Depends(get_current_user),
 ):
     emergencia = svc.actualizar_estado_emergencia(db, id_emergencia, datos.model_dump(exclude_unset=True))
-    
+
     await manager.broadcast(id_emergencia, {
         "tipo": "cambio_estado",
         "id_emergencia": id_emergencia,
@@ -167,7 +179,32 @@ async def actualizar_emergencia(
         "id_tecnico": emergencia.id_tecnico,
         "id_taller": emergencia.id_taller,
     })
-    
+
+    # Enviar notificación push al conductor
+    try:
+        conductor = db.query(Conductor).filter(
+            Conductor.id_conductor == emergencia.id_conductor
+        ).first()
+        if conductor and conductor.fcm_token:
+            mensajes = {
+                'asignada': ('✅ Taller asignado', 'Un taller aceptó tu solicitud de emergencia'),
+                'en_camino': ('🚗 Técnico en camino', 'El técnico está en camino a tu ubicación'),
+                'atendiendo': ('🔧 En atención', 'El técnico está atendiendo tu vehículo'),
+                'finalizada': ('✅ Servicio finalizado', 'Tu emergencia fue atendida exitosamente'),
+                'cancelada': ('❌ Cancelado', 'La emergencia fue cancelada'),
+            }
+            estado = emergencia.estado.value
+            if estado in mensajes:
+                titulo, cuerpo = mensajes[estado]
+                enviar_notificacion(
+                    conductor.fcm_token,
+                    titulo,
+                    cuerpo,
+                    {"id_emergencia": str(id_emergencia), "estado": estado}
+                )
+    except Exception as e:
+        print(f"Error enviando push: {e}")
+
     return emergencia
 @router.get("/tecnico/{id_tecnico}/historial", response_model=List[EmergenciaResumen])
 def historial_tecnico(
