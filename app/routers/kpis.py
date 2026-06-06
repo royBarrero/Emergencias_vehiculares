@@ -211,3 +211,98 @@ def kpis_tenant(
         "por_taller": por_taller,
         "incidentes_por_tipo": [{"tipo": r[0], "total": r[1]} for r in por_tipo],
     }
+@router.get("/geo/tenant/{id_tenant}")
+def geo_tenant(
+    id_tenant: int,
+    fecha_inicio: Optional[datetime] = Query(None),
+    fecha_fin: Optional[datetime] = Query(None),
+    tipo_incidente: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    talleres = db.query(Taller).filter(Taller.id_tenant == id_tenant).all()
+    talleres_ids = [t.id_taller for t in talleres]
+
+    if not talleres_ids:
+        return {"emergencias": [], "talleres": []}
+
+    query = db.query(Emergencia).filter(
+        Emergencia.id_taller.in_(talleres_ids),
+        Emergencia.latitud != None,
+        Emergencia.longitud != None
+    )
+    if fecha_inicio:
+        query = query.filter(Emergencia.created_at >= fecha_inicio)
+    if fecha_fin:
+        query = query.filter(Emergencia.created_at <= fecha_fin)
+    if tipo_incidente:
+        query = query.filter(Emergencia.tipo_incidente == tipo_incidente)
+
+    emergencias = query.all()
+
+    return {
+        "emergencias": [{
+            "id_emergencia": e.id_emergencia,
+            "latitud": e.latitud,
+            "longitud": e.longitud,
+            "tipo_incidente": e.tipo_incidente,
+            "estado": e.estado.value,
+            "prioridad": e.prioridad.value,
+            "fecha": e.created_at
+        } for e in emergencias],
+        "talleres": [{
+            "id_taller": t.id_taller,
+            "nombre_taller": t.nombre_taller,
+            "latitud": t.latitud,
+            "longitud": t.longitud,
+        } for t in talleres if t.latitud and t.longitud]
+    }
+
+@router.get("/geo/admin")
+def geo_admin(
+    fecha_inicio: Optional[datetime] = Query(None),
+    fecha_fin: Optional[datetime] = Query(None),
+    tipo_incidente: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    from fastapi import HTTPException
+    if current_user.id_rol != 4:
+        raise HTTPException(status_code=403, detail="Solo superadmin")
+
+    query = db.query(Emergencia).filter(
+        Emergencia.latitud != None,
+        Emergencia.longitud != None
+    )
+    if fecha_inicio:
+        query = query.filter(Emergencia.created_at >= fecha_inicio)
+    if fecha_fin:
+        query = query.filter(Emergencia.created_at <= fecha_fin)
+    if tipo_incidente:
+        query = query.filter(Emergencia.tipo_incidente == tipo_incidente)
+
+    emergencias = query.all()
+    talleres = db.query(Taller).filter(
+        Taller.latitud != None,
+        Taller.longitud != None
+    ).all()
+
+    print(f"=== GEO ADMIN === emergencias: {len(emergencias)}, talleres: {len(talleres)}")
+
+    return {
+        "emergencias": [{
+            "id_emergencia": e.id_emergencia,
+            "latitud": float(e.latitud),
+            "longitud": float(e.longitud),
+            "tipo_incidente": e.tipo_incidente,
+            "estado": e.estado.value,
+            "prioridad": e.prioridad.value,
+            "fecha": e.created_at
+        } for e in emergencias],
+        "talleres": [{
+            "id_taller": t.id_taller,
+            "nombre_taller": t.nombre_taller,
+            "latitud": float(t.latitud),
+            "longitud": float(t.longitud),
+        } for t in talleres]
+    }
