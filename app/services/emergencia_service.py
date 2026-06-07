@@ -121,14 +121,14 @@ def actualizar_estado_emergencia(db: Session, id_emergencia: int, datos: dict) -
         em.id_taller = datos['id_taller']
     if 'id_tecnico' in datos:
         em.id_tecnico = datos['id_tecnico']
-        # Cambiar disponibilidad del técnico a ocupado
         from app.models.tecnico import Tecnico
         tecnico = db.query(Tecnico).filter(Tecnico.id_tecnico == datos['id_tecnico']).first()
         if tecnico:
             tecnico.estado_disponibilidad = 'ocupado'
+    if 'tiempo_estimado_reparacion' in datos:
+        em.tiempo_estimado_reparacion = datos['tiempo_estimado_reparacion']
 
-    # Si la emergencia se finaliza, liberar al técnico
-    if datos.get('estado') == 'finalizada' and em.id_tecnico:
+    if datos.get('estado') in ['finalizada', 'cancelada'] and em.id_tecnico:
         from app.models.tecnico import Tecnico
         tecnico = db.query(Tecnico).filter(Tecnico.id_tecnico == em.id_tecnico).first()
         if tecnico:
@@ -136,4 +136,26 @@ def actualizar_estado_emergencia(db: Session, id_emergencia: int, datos: dict) -
 
     db.commit()
     db.refresh(em)
+
+    # Broadcast WebSocket con tiempo estimado incluido
+    import asyncio
+    from app.websockets.connection_manager import manager
+    mensaje = {
+        "tipo": "cambio_estado",
+        "id_emergencia": id_emergencia,
+        "estado": em.estado.value,
+        "id_tecnico": em.id_tecnico,
+        "id_taller": em.id_taller,
+        "tiempo_estimado_reparacion": em.tiempo_estimado_reparacion,
+        "recargo_cancelacion": 70.0 if em.estado.value == "cancelada" else None,
+    }
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(manager.broadcast(id_emergencia, mensaje))
+        else:
+            loop.run_until_complete(manager.broadcast(id_emergencia, mensaje))
+    except Exception:
+        pass
+
     return em

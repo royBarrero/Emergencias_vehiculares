@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey, Enum, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
 from datetime import datetime
@@ -44,6 +44,8 @@ class Emergencia(Base):
     id_tecnico = Column(Integer, ForeignKey("tecnicos.id_tecnico"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    tiempo_estimado_reparacion = Column(String(100), nullable=True)
+    atencion_directa = Column(Boolean, default=False, nullable=True)
 
     evidencias = relationship("EvidenciaEmergencia", back_populates="emergencia", cascade="all, delete-orphan")
 

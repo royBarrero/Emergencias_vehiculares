@@ -25,6 +25,7 @@ async def websocket_emergencia(
                 "estado": emergencia.estado.value,
                 "id_tecnico": emergencia.id_tecnico,
                 "id_taller": emergencia.id_taller,
+                "tiempo_estimado_reparacion": emergencia.tiempo_estimado_reparacion,
             })
         # Mantener conexión viva
         while True:
