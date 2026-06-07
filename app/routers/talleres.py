@@ -216,3 +216,12 @@ def obtener_taller_por_usuario(id_usuario: int, db: Session = Depends(get_db)):
         "id_tenant": taller.id_tenant,
         "servicios": taller.servicios
     }
+
+@router.patch("/{id_taller}/onesignal")
+def actualizar_onesignal(id_taller: int, datos: dict, db: Session = Depends(get_db)):
+    taller = db.query(Taller).filter(Taller.id_taller == id_taller).first()
+    if not taller:
+        raise HTTPException(status_code=404, detail="Taller no encontrado")
+    taller.onesignal_id = datos.get("onesignal_id")
+    db.commit()
+    return {"mensaje": "OneSignal ID actualizado"}

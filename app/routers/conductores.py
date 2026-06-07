@@ -110,3 +110,18 @@ def obtener_conductor_por_usuario(id_usuario: int, db: Session = Depends(get_db)
         "correo": conductor.usuario.correo,
         "telefono": conductor.usuario.telefono
     }
+
+@router.patch("/{id_conductor}/fcm-token")
+def actualizar_fcm_token(
+    id_conductor: int,
+    datos: dict,
+    db: Session = Depends(get_db)
+):
+    conductor = db.query(Conductor).filter(
+        Conductor.id_conductor == id_conductor
+    ).first()
+    if not conductor:
+        raise HTTPException(status_code=404, detail="Conductor no encontrado")
+    conductor.fcm_token = datos.get("fcm_token")
+    db.commit()
+    return {"mensaje": "FCM token actualizado"}

@@ -9,6 +9,7 @@ class Conductor(Base):
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), unique=True)
     licencia = Column(String(50))
     direccion = Column(String(200))
+    fcm_token = Column(String(500), nullable=True)
 
     usuario = relationship("Usuario", back_populates="conductor")
     vehiculos = relationship("Vehiculo", back_populates="conductor")

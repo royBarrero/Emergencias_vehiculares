@@ -16,6 +16,7 @@ class Taller(Base):
     descripcion = Column(String(500))
     estado = Column(String(20), default="pendiente")
     calificacion_promedio = Column(Float, default=0.0)
+    onesignal_id = Column(String(200), nullable=True)
 
     usuario = relationship("Usuario", back_populates="taller")
     tenant = relationship("Tenant", back_populates="talleres")
