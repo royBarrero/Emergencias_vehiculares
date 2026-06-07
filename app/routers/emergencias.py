@@ -184,13 +184,12 @@ def historial_tecnico(
         .order_by(Emergencia.created_at.desc())
         .all()
     )
-@router.get("/tecnico/{id_tecnico}", response_model=EmergenciaOut)
+@router.get("/tecnico/{id_tecnico}", response_model=Optional[EmergenciaOut])
 def obtener_emergencia_tecnico(
     id_tecnico: int,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    from app.models.conductor import Conductor
     em = (
         db.query(Emergencia)
         .filter(
@@ -204,8 +203,6 @@ def obtener_emergencia_tecnico(
         .order_by(Emergencia.created_at.desc())
         .first()
     )
-    if not em:
-        return None
     return em
 # Cancelar emergencia
 @router.delete("/{id_emergencia}", response_model=EmergenciaOut)

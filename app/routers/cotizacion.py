@@ -31,13 +31,26 @@ def solicitar_cotizacion(datos: CotizacionSolicitar, db: Session = Depends(get_d
 
 @router.get("/emergencia/{id_emergencia}", response_model=CotizacionRespuesta)
 def obtener_cotizacion(id_emergencia: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    cotizacion = db.query(Cotizacion).filter(
-        Cotizacion.id_emergencia == id_emergencia
-    ).order_by(Cotizacion.created_at.desc()).first()
+    from app.models.emergencia import Emergencia
+    emergencia = db.query(Emergencia).filter(Emergencia.id_emergencia == id_emergencia).first()
+    if not emergencia:
+        raise HTTPException(status_code=404, detail="Emergencia no encontrada")
+
+    query = db.query(Cotizacion).filter(
+        Cotizacion.id_emergencia == id_emergencia,
+        Cotizacion.estado.in_([
+            EstadoCotizacionEnum.solicitada,
+            EstadoCotizacionEnum.enviada,
+            EstadoCotizacionEnum.aceptada
+        ])
+    )
+    if emergencia.id_taller:
+        query = query.filter(Cotizacion.id_taller == emergencia.id_taller)
+
+    cotizacion = query.order_by(Cotizacion.created_at.desc()).first()
     if not cotizacion:
         raise HTTPException(status_code=404, detail="No hay cotización para esta emergencia")
     return cotizacion
-
 @router.put("/{id_cotizacion}/responder", response_model=CotizacionRespuesta)
 def responder_cotizacion(id_cotizacion: int, datos: CotizacionResponder, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     cotizacion = db.query(Cotizacion).filter(Cotizacion.id_cotizacion == id_cotizacion).first()
@@ -74,3 +87,11 @@ def cotizaciones_por_taller(id_taller: int, db: Session = Depends(get_db), curre
         Cotizacion.id_taller == id_taller
     ).order_by(Cotizacion.created_at.desc()).all()
     return cotizaciones
+
+@router.delete("/emergencia/{id_emergencia}")
+def limpiar_cotizaciones_emergencia(id_emergencia: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    db.query(Cotizacion).filter(
+        Cotizacion.id_emergencia == id_emergencia
+    ).delete()
+    db.commit()
+    return {"mensaje": "Cotizaciones eliminadas correctamente"}

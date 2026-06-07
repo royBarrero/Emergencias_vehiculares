@@ -1,9 +1,21 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from app.config import DATABASE_URL
+from app.config import DATABASE_URL, ENVIRONMENT
 
-engine = create_engine(DATABASE_URL)
+if ENVIRONMENT == "local":
+    connect_args = {}
+else:
+    connect_args = {"sslmode": "require"}
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args=connect_args,
+    pool_size=20,
+    max_overflow=40,
+    pool_timeout=60,
+    pool_recycle=1800,
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
