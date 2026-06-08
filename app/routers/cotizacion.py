@@ -60,7 +60,7 @@ def obtener_cotizacion(id_emergencia: int, db: Session = Depends(get_db), curren
         raise HTTPException(status_code=404, detail="No hay cotización para esta emergencia")
     return cotizacion
 @router.put("/{id_cotizacion}/responder", response_model=CotizacionRespuesta)
-def responder_cotizacion(id_cotizacion: int, datos: CotizacionResponder, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+async def responder_cotizacion(id_cotizacion: int, datos: CotizacionResponder, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     cotizacion = db.query(Cotizacion).filter(Cotizacion.id_cotizacion == id_cotizacion).first()
     if not cotizacion:
         raise HTTPException(status_code=404, detail="Cotización no encontrada")
@@ -71,32 +71,60 @@ def responder_cotizacion(id_cotizacion: int, datos: CotizacionResponder, db: Ses
     cotizacion.estado = EstadoCotizacionEnum.enviada
     db.commit()
     db.refresh(cotizacion)
-    return cotizacion
 
+    # Notificar al conductor via WebSocket
+    await manager.broadcast(cotizacion.id_emergencia, {
+        "tipo": "cotizacion_enviada",
+        "id_emergencia": cotizacion.id_emergencia,
+        "estado": "enviada",
+    })
+
+    return cotizacion
 @router.patch("/{id_cotizacion}/decision")
 async def decidir_cotizacion(id_cotizacion: int, decision: dict, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     cotizacion = db.query(Cotizacion).filter(Cotizacion.id_cotizacion == id_cotizacion).first()
     if not cotizacion:
         raise HTTPException(status_code=404, detail="Cotización no encontrada")
+    
     accion = decision.get("accion")
+    
     if accion == "aceptar":
         cotizacion.estado = EstadoCotizacionEnum.aceptada
+        from app.models.emergencia import Emergencia
+        emergencia = db.query(Emergencia).filter(
+            Emergencia.id_emergencia == cotizacion.id_emergencia
+        ).first()
+        if emergencia:
+            emergencia.estado = 'asignada'
+            db.commit()
+        await manager.broadcast(cotizacion.id_emergencia, {
+            "tipo": "cambio_estado",
+            "estado": "asignada",
+            "id_emergencia": cotizacion.id_emergencia,
+            "id_taller": emergencia.id_taller if emergencia else None,
+            "id_tecnico": None,
+        })
+        await manager.broadcast_taller(cotizacion.id_taller, {
+            "tipo": "cambio_estado",
+            "id_emergencia": cotizacion.id_emergencia,
+            "estado": "asignada",
+        })
+
     elif accion == "rechazar":
         cotizacion.estado = EstadoCotizacionEnum.rechazada
+        db.commit()
+        await manager.broadcast_taller(cotizacion.id_taller, {
+            "tipo": "decision_cotizacion",
+            "id_emergencia": cotizacion.id_emergencia,
+            "id_cotizacion": id_cotizacion,
+            "estado": "rechazada",
+        })
+
     else:
         raise HTTPException(status_code=400, detail="Acción inválida.")
-    db.commit()
+
     db.refresh(cotizacion)
-
-    # Notificar al taller via WebSocket
-    await manager.broadcast_taller(cotizacion.id_taller, {
-        "tipo": "decision_cotizacion",
-        "id_emergencia": cotizacion.id_emergencia,
-        "id_cotizacion": id_cotizacion,
-        "estado": cotizacion.estado.value,
-    })
-
-    return {"mensaje": f"Cotización {cotizacion.estado}", "id_cotizacion": id_cotizacion}
+    return {"mensaje": f"Cotización {cotizacion.estado.value}", "id_cotizacion": id_cotizacion}
 @router.get("/taller/{id_taller}", response_model=List[CotizacionRespuesta])
 def cotizaciones_por_taller(id_taller: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     cotizaciones = db.query(Cotizacion).filter(

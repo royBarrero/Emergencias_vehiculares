@@ -98,31 +98,7 @@ async def registrar_emergencia(
     conductor: Conductor = Depends(get_conductor_actual),
 ):
     emergencia = svc.crear_emergencia(db, data, conductor.id_conductor)
-    
-    # Notificar a todos los talleres activos
-    talleres = db.query(Taller).filter(Taller.estado == 'activo').all()
-    for taller in talleres:
-        await manager.broadcast_taller(taller.id_taller, {
-            "tipo": "nueva_emergencia",
-            "id_emergencia": emergencia.id_emergencia,
-            "tipo_incidente": emergencia.tipo_incidente,
-            "prioridad": emergencia.prioridad,
-            "direccion_aproximada": emergencia.direccion_aproximada,
-            "latitud": emergencia.latitud,
-            "longitud": emergencia.longitud,
-        })
-        # Notificar a talleres via OneSignal
-        for taller in talleres:
-            if taller.onesignal_id:
-                enviar_notificacion_taller(
-                    taller.onesignal_id,
-                    '🚨 Nueva emergencia',
-                    f'Tipo: {emergencia.tipo_incidente} — {emergencia.direccion_aproximada or "Sin dirección"}',
-                    {"id_emergencia": str(emergencia.id_emergencia)}
-                )
-    
     return emergencia
-
 
 # CU09 — Subir evidencia (foto o audio)
 @router.post("/{id_emergencia}/evidencia", status_code=status.HTTP_201_CREATED)
@@ -179,16 +155,29 @@ async def actualizar_emergencia(
         "id_tecnico": emergencia.id_tecnico,
         "id_taller": emergencia.id_taller,
     })
-    # Notificar al taller via WebSocket
-    if emergencia.id_taller:
-        await manager.broadcast_taller(emergencia.id_taller, {
-            "tipo": "cambio_estado",
-            "id_emergencia": id_emergencia,
-            "estado": emergencia.estado.value,
-            "id_tecnico": emergencia.id_tecnico,
-            "id_taller": emergencia.id_taller,
-        })
-    # Enviar notificación push al conductor
+   
+    # Notificar al taller cuando el conductor lo selecciona
+    if datos.model_dump(exclude_unset=True).get('id_taller') and emergencia.id_taller:
+        taller = db.query(Taller).filter(Taller.id_taller == emergencia.id_taller).first()
+        if taller:
+            await manager.broadcast_taller(emergencia.id_taller, {
+                "tipo": "nueva_emergencia",
+                "id_emergencia": id_emergencia,
+                "tipo_incidente": emergencia.tipo_incidente,
+                "prioridad": emergencia.prioridad,
+                "direccion_aproximada": emergencia.direccion_aproximada,
+                "latitud": emergencia.latitud,
+                "longitud": emergencia.longitud,
+            })
+            if taller.onesignal_id:
+                enviar_notificacion_taller(
+                    taller.onesignal_id,
+                    '🚨 Nueva solicitud de emergencia',
+                    f'Tipo: {emergencia.tipo_incidente} — {emergencia.direccion_aproximada or "Sin dirección"}',
+                    {"id_emergencia": str(id_emergencia)}
+                )
+
+    # Notificar al conductor por FCM cuando cambia el estado
     try:
         conductor = db.query(Conductor).filter(
             Conductor.id_conductor == emergencia.id_conductor
@@ -211,8 +200,7 @@ async def actualizar_emergencia(
                     {"id_emergencia": str(id_emergencia), "estado": estado}
                 )
     except Exception as e:
-        print(f"Error enviando push: {e}")
-
+        print(f"Error enviando push FCM: {e}")
     return emergencia
 @router.get("/tecnico/{id_tecnico}/historial", response_model=List[EmergenciaResumen])
 def historial_tecnico(
