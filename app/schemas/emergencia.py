@@ -103,4 +103,5 @@ class EmergenciaUpdate(BaseModel):
     id_tecnico: Optional[int] = None
     tiempo_estimado_reparacion: Optional[str] = None
     atencion_directa: Optional[bool] = None
+    monto_cotizacion: Optional[float] = None  # ← agregar
     

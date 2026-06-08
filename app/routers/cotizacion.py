@@ -96,6 +96,7 @@ async def decidir_cotizacion(id_cotizacion: int, decision: dict, db: Session = D
         ).first()
         if emergencia:
             emergencia.estado = 'asignada'
+            emergencia.monto_cotizacion = cotizacion.monto_estimado
             db.commit()
         await manager.broadcast(cotizacion.id_emergencia, {
             "tipo": "cambio_estado",

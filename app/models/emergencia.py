@@ -46,6 +46,7 @@ class Emergencia(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     tiempo_estimado_reparacion = Column(String(100), nullable=True)
     atencion_directa = Column(Boolean, default=False, nullable=True)
+    monto_cotizacion = Column(Float, nullable=True)
 
     evidencias = relationship("EvidenciaEmergencia", back_populates="emergencia", cascade="all, delete-orphan")
 

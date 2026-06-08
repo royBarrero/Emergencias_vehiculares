@@ -225,3 +225,40 @@ def actualizar_onesignal(id_taller: int, datos: dict, db: Session = Depends(get_
     taller.onesignal_id = datos.get("onesignal_id")
     db.commit()
     return {"mensaje": "OneSignal ID actualizado"}
+
+@router.post("/{id_taller}/calificar")
+async def calificar_taller(
+    id_taller: int,
+    datos: dict,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    from app.models.emergencia import Emergencia
+    
+    taller = db.query(Taller).filter(Taller.id_taller == id_taller).first()
+    if not taller:
+        raise HTTPException(status_code=404, detail="Taller no encontrado")
+    
+    calificacion = datos.get("calificacion", 0)
+    if calificacion < 1 or calificacion > 5:
+        raise HTTPException(status_code=400, detail="Calificación debe ser entre 1 y 5")
+
+    # Contar emergencias finalizadas para calcular promedio
+    total = db.query(Emergencia).filter(
+        Emergencia.id_taller == id_taller,
+        Emergencia.estado == 'finalizada'
+    ).count()
+
+    if total <= 1:
+        taller.calificacion_promedio = float(calificacion)
+    else:
+        promedio_actual = taller.calificacion_promedio or 0.0
+        taller.calificacion_promedio = round(
+            (promedio_actual * (total - 1) + calificacion) / total, 2
+        )
+
+    db.commit()
+    return {
+        "mensaje": "Calificación registrada",
+        "nuevo_promedio": taller.calificacion_promedio
+    }

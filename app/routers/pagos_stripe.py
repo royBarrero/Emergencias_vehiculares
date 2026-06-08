@@ -104,3 +104,43 @@ def confirmar_pago(
             "estado": "completado"
         }
     }
+
+@router.post("/confirmar-efectivo/{id_emergencia}")
+def confirmar_pago_efectivo(
+    id_emergencia: int,
+    datos: dict,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    monto_total = float(datos.get("monto_total", 0))
+    comision = round(monto_total * 0.10, 2)
+    monto_neto = round(monto_total - comision, 2)
+
+    pago_existente = db.query(Pago).filter(
+        Pago.id_emergencia == id_emergencia
+    ).first()
+
+    if pago_existente:
+        pago_existente.estado = EstadoPagoEnum.completado
+        pago_existente.monto_total = monto_total
+        pago_existente.comision = comision
+        pago_existente.monto_neto = monto_neto
+        pago_existente.metodo_pago = MetodoPagoEnum.efectivo
+    else:
+        pago = Pago(
+            id_emergencia=id_emergencia,
+            monto_total=monto_total,
+            comision=comision,
+            monto_neto=monto_neto,
+            metodo_pago=MetodoPagoEnum.efectivo,
+            estado=EstadoPagoEnum.completado
+        )
+        db.add(pago)
+
+    db.commit()
+    return {
+        "mensaje": "Pago en efectivo registrado",
+        "monto_total": monto_total,
+        "comision": comision,
+        "monto_neto": monto_neto,
+    }
