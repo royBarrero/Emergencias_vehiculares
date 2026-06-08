@@ -47,13 +47,13 @@ def analizar_imagen_vehiculo(url_imagen: str) -> str:
 
         imagen_bytes = response.content
 
-        prompt = """Eres un mecánico experto. Analiza esta imagen de un vehículo con problemas.
-        Describe brevemente:
-        1. Qué problema visual puedes identificar
-        2. Posible causa
-        3. Urgencia (baja/media/alta)
-        
-        Responde de forma concisa y profesional en español.
+        prompt = """Eres un mecánico experto. Analiza esta imagen de un vehículo.
+        Responde EXACTAMENTE en este formato, sin markdown, sin asteriscos, sin numeración:
+
+        PROBLEMA: [Una línea describiendo el problema visual]
+        CAUSA: [Una línea con la posible causa]
+        URGENCIA: [Solo una palabra: BAJA, MEDIA o ALTA]
+        RECOMENDACION: [Una línea con la acción recomendada]
         """
 
         resultado = client.models.generate_content(

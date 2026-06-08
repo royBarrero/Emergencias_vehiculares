@@ -179,7 +179,15 @@ async def actualizar_emergencia(
         "id_tecnico": emergencia.id_tecnico,
         "id_taller": emergencia.id_taller,
     })
-
+    # Notificar al taller via WebSocket
+    if emergencia.id_taller:
+        await manager.broadcast_taller(emergencia.id_taller, {
+            "tipo": "cambio_estado",
+            "id_emergencia": id_emergencia,
+            "estado": emergencia.estado.value,
+            "id_tecnico": emergencia.id_tecnico,
+            "id_taller": emergencia.id_taller,
+        })
     # Enviar notificación push al conductor
     try:
         conductor = db.query(Conductor).filter(
@@ -241,11 +249,32 @@ def obtener_emergencia_tecnico(
         .first()
     )
     return em
-# Cancelar emergencia
 @router.delete("/{id_emergencia}", response_model=EmergenciaOut)
-def cancelar_emergencia(
+async def cancelar_emergencia(
     id_emergencia: int,
     db: Session = Depends(get_db),
     conductor: Conductor = Depends(get_conductor_actual),
 ):
-    return svc.cancelar_emergencia(db, id_emergencia, conductor.id_conductor)
+    emergencia = svc.cancelar_emergencia(db, id_emergencia, conductor.id_conductor)
+    
+    # Broadcast WebSocket
+    await manager.broadcast(id_emergencia, {
+        "tipo": "cambio_estado",
+        "id_emergencia": id_emergencia,
+        "estado": "cancelada",
+        "id_tecnico": emergencia.id_tecnico,
+        "id_taller": emergencia.id_taller,
+    })
+
+    # Notificar al taller via OneSignal
+    if emergencia.id_taller:
+        taller = db.query(Taller).filter(Taller.id_taller == emergencia.id_taller).first()
+        if taller and taller.onesignal_id:
+            enviar_notificacion_taller(
+                taller.onesignal_id,
+                '❌ Emergencia cancelada',
+                'El conductor canceló la solicitud de servicio',
+                {"id_emergencia": str(id_emergencia)}
+            )
+
+    return emergencia
