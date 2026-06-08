@@ -7,7 +7,11 @@ _firebase_inicializado = False
 def inicializar_firebase():
     global _firebase_inicializado
     if not _firebase_inicializado:
-        cred_path = os.path.join(os.path.dirname(__file__), 'firebase-credentials.json')
+        import os
+        cred_path = os.environ.get(
+                'FIREBASE_CREDENTIALS_PATH',
+                os.path.join(os.path.dirname(__file__), 'firebase-credentials.json')
+        )
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
         _firebase_inicializado = True
